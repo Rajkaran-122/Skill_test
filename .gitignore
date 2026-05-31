@@ -1,0 +1,73 @@
+# ============================================================
+# Store Intelligence Platform — .gitignore
+# ============================================================
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+
+# Model weights (large files)
+*.pt
+*.pth
+*.onnx
+*.engine
+services/cv-pipeline/src/detector/models/
+
+# Node.js
+node_modules/
+services/dashboard/dist/
+services/dashboard/build/
+.next/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Docker
+docker-compose.override.yml
+
+# Data volumes
+data/
+postgres_data/
+redis_data/
+kafka_data/
+
+# Logs
+*.log
+logs/
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+coverage/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Grafana
+grafana_data/
+
+# Videos
+CCTV Footage/
+

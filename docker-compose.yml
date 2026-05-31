@@ -1,0 +1,247 @@
+# ============================================================
+# Store Intelligence Platform — Docker Compose (Base)
+# ============================================================
+# Usage:
+#   Development: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#   Production:  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# ============================================================
+
+services:
+  # ===========================================================
+  # DATA LAYER
+  # ===========================================================
+
+  postgres:
+    image: timescale/timescaledb:latest-pg17
+    container_name: sip-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sip_db}
+      POSTGRES_USER: ${POSTGRES_USER:-sip_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_in_production}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infrastructure/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./infrastructure/postgres/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sip_user} -d ${POSTGRES_DB:-sip_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - sip-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: sip-redis
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sip-network
+    restart: unless-stopped
+
+  kafka:
+    image: apache/kafka:4.0.0
+    container_name: sip-kafka
+    environment:
+      # KRaft mode (no Zookeeper)
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # Listeners
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,EXTERNAL://0.0.0.0:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # Cluster
+      CLUSTER_ID: "SIPCluster0001"
+      # Performance
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_NUM_PARTITIONS: 6
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    ports:
+      - "9092:9092"
+      - "9094:9094"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+      - ./infrastructure/kafka/create-topics.sh:/opt/kafka/create-topics.sh
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 45s
+    networks:
+      - sip-network
+    restart: unless-stopped
+
+  # ===========================================================
+  # APPLICATION LAYER
+  # ===========================================================
+
+  cv-pipeline:
+    build:
+      context: ./services/cv-pipeline
+      dockerfile: Dockerfile
+    container_name: sip-cv-pipeline
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      YOLO_MODEL: ${YOLO_MODEL:-yolo11n.pt}
+      YOLO_CONFIDENCE_THRESHOLD: ${YOLO_CONFIDENCE_THRESHOLD:-0.5}
+      YOLO_DEVICE: ${YOLO_DEVICE:-cpu}
+      OSNET_MODEL: ${OSNET_MODEL:-osnet_x1_0}
+      OSNET_SIMILARITY_THRESHOLD: ${OSNET_SIMILARITY_THRESHOLD:-0.7}
+      REID_GALLERY_TTL_SECONDS: ${REID_GALLERY_TTL_SECONDS:-7200}
+      VIDEO_SOURCE: ${VIDEO_SOURCE:-0}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - sip-network
+    restart: unless-stopped
+
+  event-processor:
+    build:
+      context: ./services/event-processor
+      dockerfile: Dockerfile
+    container_name: sip-event-processor
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-sip_user}:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/${POSTGRES_DB:-sip_db}
+      REDIS_URL: redis://redis:6379/0
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      ANOMALY_SIGMA_THRESHOLD: ${ANOMALY_SIGMA_THRESHOLD:-3.0}
+      ANOMALY_DEAD_ZONE_MINUTES: ${ANOMALY_DEAD_ZONE_MINUTES:-30}
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - sip-network
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    container_name: sip-api
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-sip_user}:${POSTGRES_PASSWORD:-change_me_in_production}@postgres:5432/${POSTGRES_DB:-sip_db}
+      REDIS_URL: redis://redis:6379/0
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change_this_to_a_secure_random_string}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      API_CORS_ORIGINS: ${API_CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - sip-network
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: ./services/dashboard
+      dockerfile: Dockerfile
+    container_name: sip-dashboard
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000/api/v1}
+      VITE_WS_URL: ${VITE_WS_URL:-ws://localhost:8000/api/v1/ws}
+    ports:
+      - "${DASHBOARD_PORT:-3000}:3000"
+    depends_on:
+      - api
+    networks:
+      - sip-network
+    restart: unless-stopped
+
+  # ===========================================================
+  # OBSERVABILITY LAYER
+  # ===========================================================
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: sip-prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - sip-network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: sip-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infrastructure/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    networks:
+      - sip-network
+    restart: unless-stopped
+
+# ===========================================================
+# NETWORKS & VOLUMES
+# ===========================================================
+
+networks:
+  sip-network:
+    driver: bridge
+    name: sip-network
+
+volumes:
+  postgres_data:
+    name: sip-postgres-data
+  redis_data:
+    name: sip-redis-data
+  kafka_data:
+    name: sip-kafka-data
+  prometheus_data:
+    name: sip-prometheus-data
+  grafana_data:
+    name: sip-grafana-data
