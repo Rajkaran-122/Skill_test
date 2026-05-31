@@ -7,15 +7,96 @@
 ![React](https://img.shields.io/badge/react-19-61dafb)
 ![License](https://img.shields.io/badge/license-proprietary-red)
 
-## Architecture
+## Architecture & Data Flow
 
+### 1. Data Flow Diagram (DFD)
+```mermaid
+graph TD
+    classDef default fill:#ffffff,stroke:#000000,stroke-width:2px,color:#000000;
+    classDef datastore fill:#ffffff,stroke:#000000,stroke-width:2px,color:#000000;
+    classDef external fill:#f3f3f3,stroke:#000000,stroke-width:2px,color:#000000;
+
+    CCTV["CCTV Cameras"]:::external
+    MANAGER["Store Manager"]:::external
+
+    P1("1.0 Computer Vision<br/>Pipeline")
+    P2("2.0 Event Bus<br/>(Kafka)")
+    P3("3.0 Event<br/>Processor")
+    P4("4.0 API<br/>Platform")
+    
+    D1[("D1: TimescaleDB<br/>(Historical)")]:::datastore
+    D2[("D2: Redis<br/>(Hot Metrics)")]:::datastore
+
+    CCTV -->|Video Frames| P1
+    P1 -->|Detection/Tracking| P2
+    P2 -->|Raw CV Events| P3
+    
+    P3 -->|Persist Sessions| D1
+    P3 -->|Update Live KPIs| D2
+    
+    P3 -.->|Pub/Sub Alerts| P4
+    D1 -->|Query Aggregates| P4
+    D2 -->|Fetch Hot Cache| P4
+    
+    P4 <-->|REST / WebSocket| UI("5.0 React Dashboard")
+    UI -->|Rendered Insights| MANAGER
 ```
-CCTV Cameras → YOLO11 Detection → ByteTrack Tracking → OSNet Re-ID
-    → Event Generator → Kafka 4.0 (KRaft)
-    → Session Builder | Queue Engine | Metrics Engine | Anomaly Engine
-    → PostgreSQL + TimescaleDB
-    → FastAPI (REST + WebSocket)
-    → React Dashboard
+
+### 2. System Architecture
+```mermaid
+graph TD
+    classDef default fill:#ffffff,stroke:#000000,stroke-width:2px,color:#000000;
+    classDef layer fill:#fcfcfc,stroke:#000000,stroke-width:1px,color:#000000;
+    
+    subgraph Edge["Edge Processing Layer (Store)"]
+        direction LR
+        CAM["IP Cameras"] --> CV["CV Pipeline Service<br/>(YOLO11 / ByteTrack / OSNet)"]
+    end
+    class Edge layer
+
+    subgraph Messaging["Messaging Layer"]
+        KAFKA["Apache Kafka (KRaft Mode)<br/>Topics: visitor-events, zone-events..."]
+    end
+    class Messaging layer
+
+    subgraph Processing["Data Processing Layer"]
+        EP["Event Processor Service"]
+        SE["Session Builder"]
+        ME["Metrics Engine"]
+        QE["Queue Engine"]
+        AE["Anomaly Engine"]
+        
+        EP --- SE
+        EP --- ME
+        EP --- QE
+        EP --- AE
+    end
+    class Processing layer
+
+    subgraph Storage["Persistence Layer"]
+        direction LR
+        TS[("PostgreSQL 17<br/>+ TimescaleDB")]
+        RD[("Redis 7.4<br/>(Cache & Pub/Sub)")]
+    end
+    class Storage layer
+
+    subgraph Serving["Serving & UI Layer"]
+        API["FastAPI Service<br/>(REST + WebSockets)"]
+        DASH["React 19 Dashboard<br/>(Vite + Tailwind)"]
+    end
+    class Serving layer
+
+    %% Connections
+    CV -->|Publish Events| KAFKA
+    KAFKA -->|Consume Batch| EP
+    
+    EP -->|SQL Insert| TS
+    EP -->|SET / PUBLISH| RD
+    
+    TS -->|SQL Select| API
+    RD -->|GET / SUBSCRIBE| API
+    
+    API <-->|HTTP / WS| DASH
 ```
 
 ## Quick Start
