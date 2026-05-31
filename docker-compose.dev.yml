@@ -5,7 +5,43 @@
 # ============================================================
 
 services:
-  cv-pipeline:
+  cv-pipeline-cam1:
+    build:
+      target: development
+    volumes:
+      - ./services/cv-pipeline/src:/app/src
+    environment:
+      YOLO_DEVICE: cpu
+      LOG_LEVEL: DEBUG
+
+  cv-pipeline-cam2:
+    build:
+      target: development
+    volumes:
+      - ./services/cv-pipeline/src:/app/src
+    environment:
+      YOLO_DEVICE: cpu
+      LOG_LEVEL: DEBUG
+
+  cv-pipeline-cam3:
+    build:
+      target: development
+    volumes:
+      - ./services/cv-pipeline/src:/app/src
+    environment:
+      YOLO_DEVICE: cpu
+      LOG_LEVEL: DEBUG
+
+  cv-pipeline-cam4:
+    build:
+      target: development
+    volumes:
+      - ./services/cv-pipeline/src:/app/src
+    environment:
+      YOLO_DEVICE: cpu
+      LOG_LEVEL: DEBUG
+
+  cv-pipeline-cam5:
     build:
       target: development
     volumes:
