@@ -100,21 +100,99 @@ services:
   # APPLICATION LAYER
   # ===========================================================
 
-  cv-pipeline:
+  cv-pipeline-cam1:
     build:
       context: ./services/cv-pipeline
       dockerfile: Dockerfile
-    container_name: sip-cv-pipeline
+    container_name: sip-cv-pipeline-cam1
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      CAMERA_ID: CAM01
+      VIDEO_SOURCE: "/footage/CAM 1.mp4"
       YOLO_MODEL: ${YOLO_MODEL:-yolo11n.pt}
-      YOLO_CONFIDENCE_THRESHOLD: ${YOLO_CONFIDENCE_THRESHOLD:-0.5}
       YOLO_DEVICE: ${YOLO_DEVICE:-cpu}
-      OSNET_MODEL: ${OSNET_MODEL:-osnet_x1_0}
-      OSNET_SIMILARITY_THRESHOLD: ${OSNET_SIMILARITY_THRESHOLD:-0.7}
-      REID_GALLERY_TTL_SECONDS: ${REID_GALLERY_TTL_SECONDS:-7200}
-      VIDEO_SOURCE: ${VIDEO_SOURCE:-0}
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - "./CCTV Footage:/footage:ro"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - sip-network
+    restart: unless-stopped
+
+  cv-pipeline-cam2:
+    build:
+      context: ./services/cv-pipeline
+      dockerfile: Dockerfile
+    container_name: sip-cv-pipeline-cam2
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      CAMERA_ID: CAM02
+      VIDEO_SOURCE: "/footage/CAM 2.mp4"
+      YOLO_MODEL: ${YOLO_MODEL:-yolo11n.pt}
+      YOLO_DEVICE: ${YOLO_DEVICE:-cpu}
+    volumes:
+      - "./CCTV Footage:/footage:ro"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - sip-network
+    restart: unless-stopped
+
+  cv-pipeline-cam3:
+    build:
+      context: ./services/cv-pipeline
+      dockerfile: Dockerfile
+    container_name: sip-cv-pipeline-cam3
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      CAMERA_ID: CAM03
+      VIDEO_SOURCE: "/footage/CAM 3.mp4"
+      YOLO_MODEL: ${YOLO_MODEL:-yolo11n.pt}
+      YOLO_DEVICE: ${YOLO_DEVICE:-cpu}
+    volumes:
+      - "./CCTV Footage:/footage:ro"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - sip-network
+    restart: unless-stopped
+
+  cv-pipeline-cam4:
+    build:
+      context: ./services/cv-pipeline
+      dockerfile: Dockerfile
+    container_name: sip-cv-pipeline-cam4
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      CAMERA_ID: CAM04
+      VIDEO_SOURCE: "/footage/CAM 4.mp4"
+      YOLO_MODEL: ${YOLO_MODEL:-yolo11n.pt}
+      YOLO_DEVICE: ${YOLO_DEVICE:-cpu}
+    volumes:
+      - "./CCTV Footage:/footage:ro"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - sip-network
+    restart: unless-stopped
+
+  cv-pipeline-cam5:
+    build:
+      context: ./services/cv-pipeline
+      dockerfile: Dockerfile
+    container_name: sip-cv-pipeline-cam5
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      CAMERA_ID: CAM05
+      VIDEO_SOURCE: "/footage/CAM 5.mp4"
+      YOLO_MODEL: ${YOLO_MODEL:-yolo11n.pt}
+      YOLO_DEVICE: ${YOLO_DEVICE:-cpu}
+    volumes:
+      - "./CCTV Footage:/footage:ro"
     depends_on:
       kafka:
         condition: service_healthy

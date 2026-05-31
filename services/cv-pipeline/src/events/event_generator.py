@@ -27,7 +27,7 @@ class EventGenerator:
 
     def __init__(self, config: PipelineConfig):
         self._store_id = config.store_id
-        self._camera_id = "CAM01"  # Will be set per camera stream
+        self._camera_id = config.camera_id
 
     def set_camera(self, camera_id: str) -> None:
         """Set the current camera ID for generated events."""

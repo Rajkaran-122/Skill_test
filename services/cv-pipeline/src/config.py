@@ -104,6 +104,7 @@ class PipelineConfig(BaseSettings):
     video: VideoConfig = Field(default_factory=VideoConfig)
 
     # General
+    camera_id: str = Field(default="CAM01", alias="CAMERA_ID")
     store_id: str = Field(default="STORE001", alias="STORE_ID")
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     metrics_port: int = Field(default=8001, description="Prometheus metrics port")
