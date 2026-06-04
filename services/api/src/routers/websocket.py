@@ -33,16 +33,17 @@ async def websocket_dashboard(websocket: WebSocket, store_id: str):
     await ws_manager.connect(store_id, websocket)
 
     try:
-        # Send initial snapshot
+        # Send initial snapshot if redis is available
         redis = websocket.app.state.redis
-        cache_key = f"sip:metrics:{store_id}"
-        cached = await redis.get(cache_key)
-        if cached:
-            await websocket.send_json({
-                "type": "INITIAL_SNAPSHOT",
-                "store_id": store_id,
-                "data": json.loads(cached),
-            })
+        if redis:
+            cache_key = f"sip:metrics:{store_id}"
+            cached = await redis.get(cache_key)
+            if cached:
+                await websocket.send_json({
+                    "type": "INITIAL_SNAPSHOT",
+                    "store_id": store_id,
+                    "data": json.loads(cached),
+                })
 
         # Keep connection alive and listen for client messages
         while True:

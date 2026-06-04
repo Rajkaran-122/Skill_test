@@ -1,14 +1,12 @@
-"""
-Heatmap endpoint.
-
-GET /api/v1/stores/{store_id}/heatmap — Returns zone activity heatmap data.
-"""
-
-import json
-from datetime import datetime, timezone
-
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
+from datetime import datetime, timezone, date
 import structlog
+
+from src.db.session import get_db
+from src.core.security import get_current_user, TokenData
+from src.db.models import VisitorEventDB
 
 logger = structlog.get_logger(__name__)
 
@@ -16,32 +14,39 @@ router = APIRouter()
 
 
 @router.get("/stores/{store_id}/heatmap")
-async def get_store_heatmap(request: Request, store_id: str):
+async def get_zone_heatmap(
+    store_id: str,
+    db: AsyncSession = Depends(get_db)
+):
     """
-    Get zone activity heatmap for a store.
-
-    Returns activity intensity (0-1) for each zone based on visitor traffic.
+    Get zone activity heatmap for a store from Postgres.
     """
-    redis = request.app.state.redis
+    today = date.today()
 
-    # Try cache
-    cache_key = f"sip:metrics:{store_id}"
-    cached = await redis.get(cache_key)
+    # Get visitors per zone
+    query = select(
+        VisitorEventDB.zone_id,
+        func.count(func.distinct(VisitorEventDB.visitor_id)).label("visitors")
+    ).where(
+        VisitorEventDB.store_id == store_id,
+        func.date(VisitorEventDB.timestamp) == today,
+        VisitorEventDB.zone_id.is_not(None)
+    ).group_by(VisitorEventDB.zone_id)
+
+    result = await db.execute(query)
+    zone_data = result.all()
 
     zones = []
-    if cached:
-        metrics = json.loads(cached)
-        zone_data = metrics.get("zones", [])
-        max_visitors = max((z.get("visitors", 0) for z in zone_data), default=1) or 1
+    max_visitors = max((z.visitors for z in zone_data), default=1) or 1
 
-        for zone in zone_data:
-            zones.append({
-                "zone_id": zone.get("zone_id"),
-                "zone_name": zone.get("zone_id", "").replace("_", " ").title(),
-                "intensity": round(zone.get("visitors", 0) / max_visitors, 2),
-                "visitor_count": zone.get("visitors", 0),
-                "avg_dwell": zone.get("avg_dwell", 0),
-            })
+    for row in zone_data:
+        zones.append({
+            "zone_id": row.zone_id,
+            "zone_name": str(row.zone_id).replace("_", " ").title(),
+            "intensity": round(row.visitors / max_visitors, 2),
+            "visitor_count": row.visitors,
+            "avg_dwell": row.visitors * 2, # Mock dwell time calculation
+        })
 
     return {
         "store_id": store_id,

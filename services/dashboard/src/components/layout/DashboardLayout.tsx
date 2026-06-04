@@ -4,11 +4,11 @@ import Header from './Header'
 
 export default function DashboardLayout() {
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar />
+    <div className="flex h-screen bg-dark-bg-primary overflow-hidden">
+      <Sidebar isOpen={true} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header />
-        <main className="flex-1 overflow-y-auto p-6" style={{ background: 'var(--color-bg-primary)' }}>
+        <main className="flex-1 overflow-y-auto p-8">
           <Outlet />
         </main>
       </div>

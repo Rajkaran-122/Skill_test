@@ -40,8 +40,8 @@ services:
     command: >
       redis-server
       --appendonly yes
-      --maxmemory 256mb
-      --maxmemory-policy allkeys-lru
+      --maxmemory 1gb
+      --maxmemory-policy volatile-lru
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
@@ -79,7 +79,7 @@ services:
       KAFKA_DEFAULT_REPLICATION_FACTOR: 1
       KAFKA_LOG_RETENTION_HOURS: 168
       KAFKA_LOG_SEGMENT_BYTES: 1073741824
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     ports:
       - "9092:9092"
       - "9094:9094"
@@ -110,7 +110,7 @@ services:
       CAMERA_ID: CAM01
       VIDEO_SOURCE: "/footage/CAM 1.mp4"
       YOLO_MODEL: ${YOLO_MODEL:-yolo11n.pt}
-      YOLO_DEVICE: ${YOLO_DEVICE:-cpu}
+      YOLO_DEVICE: ${YOLO_DEVICE:-cuda:0}
     volumes:
       - "./CCTV Footage:/footage:ro"
     depends_on:
@@ -130,7 +130,7 @@ services:
       CAMERA_ID: CAM02
       VIDEO_SOURCE: "/footage/CAM 2.mp4"
       YOLO_MODEL: ${YOLO_MODEL:-yolo11n.pt}
-      YOLO_DEVICE: ${YOLO_DEVICE:-cpu}
+      YOLO_DEVICE: ${YOLO_DEVICE:-cuda:0}
     volumes:
       - "./CCTV Footage:/footage:ro"
     depends_on:
@@ -150,7 +150,7 @@ services:
       CAMERA_ID: CAM03
       VIDEO_SOURCE: "/footage/CAM 3.mp4"
       YOLO_MODEL: ${YOLO_MODEL:-yolo11n.pt}
-      YOLO_DEVICE: ${YOLO_DEVICE:-cpu}
+      YOLO_DEVICE: ${YOLO_DEVICE:-cuda:0}
     volumes:
       - "./CCTV Footage:/footage:ro"
     depends_on:
@@ -170,7 +170,7 @@ services:
       CAMERA_ID: CAM04
       VIDEO_SOURCE: "/footage/CAM 4.mp4"
       YOLO_MODEL: ${YOLO_MODEL:-yolo11n.pt}
-      YOLO_DEVICE: ${YOLO_DEVICE:-cpu}
+      YOLO_DEVICE: ${YOLO_DEVICE:-cuda:0}
     volumes:
       - "./CCTV Footage:/footage:ro"
     depends_on:
@@ -190,7 +190,7 @@ services:
       CAMERA_ID: CAM05
       VIDEO_SOURCE: "/footage/CAM 5.mp4"
       YOLO_MODEL: ${YOLO_MODEL:-yolo11n.pt}
-      YOLO_DEVICE: ${YOLO_DEVICE:-cpu}
+      YOLO_DEVICE: ${YOLO_DEVICE:-cuda:0}
     volumes:
       - "./CCTV Footage:/footage:ro"
     depends_on:

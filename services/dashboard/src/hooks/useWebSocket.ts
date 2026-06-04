@@ -21,7 +21,7 @@ export function useWebSocket({ url, onMessage, reconnectInterval = 3000, maxReco
   })
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectAttemptsRef = useRef(0)
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   const connect = useCallback(() => {
     try {

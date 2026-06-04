@@ -1,60 +1,72 @@
-"""
-Metrics endpoint.
+from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
+from datetime import datetime, date
 
-GET /api/v1/stores/{store_id}/metrics — Returns store KPIs.
-Reads from Redis cache for sub-200ms responses, falls back to DB.
-"""
-
-import json
-from datetime import datetime, timezone
-
-from fastapi import APIRouter, Request, HTTPException, Query
-import structlog
-
-logger = structlog.get_logger(__name__)
+from src.db.session import get_db
+from src.core.security import get_current_user, TokenData
+from src.db.models import StoreSessionDB, AnomalyDB
 
 router = APIRouter()
 
-
 @router.get("/stores/{store_id}/metrics")
 async def get_store_metrics(
-    request: Request,
     store_id: str,
-    period_hours: int = Query(default=24, ge=1, le=720, description="Lookback period in hours"),
+    db: AsyncSession = Depends(get_db)
 ):
     """
-    Get real-time store metrics (KPIs).
-
-    Returns visitor count, conversion rate, queue depth, revenue, and zone metrics.
-    Data is served from Redis cache when available for <200ms latency.
+    Get aggregated KPIs from PostgreSQL database.
     """
-    redis = request.app.state.redis
+    today = date.today()
+    
+    # Visitors Today
+    visitors_query = select(func.count(StoreSessionDB.id)).where(
+        StoreSessionDB.store_id == store_id,
+        func.date(StoreSessionDB.entry_time) == today
+    )
+    visitors_res = await db.execute(visitors_query)
+    visitors_today = visitors_res.scalar() or 0
 
-    # Try Redis cache first
-    cache_key = f"sip:metrics:{store_id}"
-    cached = await redis.get(cache_key)
+    # Conversion Rate (All time for now, or today)
+    converted_query = select(func.count(StoreSessionDB.id)).where(
+        StoreSessionDB.store_id == store_id,
+        func.date(StoreSessionDB.entry_time) == today,
+        StoreSessionDB.converted == True
+    )
+    converted_res = await db.execute(converted_query)
+    converted_today = converted_res.scalar() or 0
+    
+    conversion_rate = (converted_today / visitors_today * 100) if visitors_today > 0 else 0.0
 
-    if cached:
-        metrics = json.loads(cached)
-        return {
-            "store_id": store_id,
-            "source": "cache",
-            "period": {"hours": period_hours},
-            **metrics,
-        }
+    # Mock Revenue based on conversions * average order value (e.g. ₹3,500)
+    revenue = converted_today * 3500
 
-    # Fallback: return placeholder (in production, query TimescaleDB)
+    # Active Alerts
+    alerts_query = select(func.count(AnomalyDB.id)).where(
+        AnomalyDB.store_id == store_id,
+        AnomalyDB.resolved == False
+    )
+    alerts_res = await db.execute(alerts_query)
+    active_alerts = alerts_res.scalar() or 0
+
     return {
         "store_id": store_id,
-        "source": "database",
-        "period": {
-            "start": datetime.now(timezone.utc).isoformat(),
-            "end": datetime.now(timezone.utc).isoformat(),
-            "hours": period_hours,
+        "kpis": {
+            "visitors_today": visitors_today,
+            "visitors_change": 5.2, # Mock trend
+            "conversion_rate": round(conversion_rate, 1),
+            "conversion_change": 1.1, # Mock trend
+            "revenue": revenue,
+            "revenue_change": 2.3, # Mock trend
+            "queue_depth": 5, # Mock, since queue requires real-time spatial analysis
+            "queue_change": -2.0,
+            "active_alerts": active_alerts,
+            "alerts_change": 0.0
         },
-        "visitors": {"total": 0, "unique": 0, "returning": 0},
-        "conversion": {"rate": 0.0, "purchases": 0, "revenue": 0.0},
-        "queue": {"current_depth": 0, "avg_wait_seconds": 0, "abandonments": 0},
-        "dwell": {"avg_seconds": 0, "median_seconds": 0},
-        "zones": [],
+        "visitor_trend": [
+            {"time": "09:00", "visitors": int(visitors_today * 0.1), "purchases": int(converted_today * 0.1)},
+            {"time": "12:00", "visitors": int(visitors_today * 0.4), "purchases": int(converted_today * 0.4)},
+            {"time": "15:00", "visitors": int(visitors_today * 0.3), "purchases": int(converted_today * 0.3)},
+            {"time": "18:00", "visitors": int(visitors_today * 0.2), "purchases": int(converted_today * 0.2)}
+        ]
     }

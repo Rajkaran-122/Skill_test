@@ -61,15 +61,17 @@ graph TD
 
     subgraph Processing["Data Processing Layer"]
         EP["Event Processor Service"]
-        SE["Session Builder"]
+        SE["Session Builder<br/>(Trajectory Stitching)"]
+        SC["Staff Classifier<br/>(Dwell & Uniform Filters)"]
         ME["Metrics Engine"]
         QE["Queue Engine"]
         AE["Anomaly Engine"]
         
         EP --- SE
-        EP --- ME
-        EP --- QE
-        EP --- AE
+        SE --- SC
+        SC --- ME
+        SC --- QE
+        SC --- AE
     end
     class Processing layer
 
@@ -179,6 +181,52 @@ python scripts/simulate_video.py --events 1000 --kafka localhost:9094
 | Cache | Redis 7.4 |
 | Frontend | React 19 + TailwindCSS 4 |
 | Monitoring | Prometheus + Grafana |
+
+## Core Subsystems
+
+### 1. Session Builder & Tracking
+Rather than raw box counts, the pipeline aggregates events into comprehensive visitor sessions.
+* **Embeddings**: OSNet extracts appearance embeddings upon entry.
+* **Re-identification**: When a visitor leaves a camera's FoV and enters another, cosine similarity is used to stitch the trajectories into a unified session.
+
+### 2. Staff Classification Engine
+To ensure pristine conversion metrics, retail staff must not be counted as visitors.
+The Staff Classifier applies a scoring heuristic:
+* **Uniform Detection**: Color histogram matching against known brand uniforms.
+* **Behavioral Patterns**: Extended dwell time (8+ hours) and high frequency in the Point-of-Sale (POS) zone.
+* **Result**: Staff trajectories are flagged `is_staff=true` and excluded from funnel analytics.
+
+### 3. Anomaly Engine Mathematics
+Anomalies are detected using real-time statistical deviations rather than hardcoded thresholds:
+* **Queue Spike**: Triggers if `current_queue_depth > rolling_mean_1h + (3 * std_dev)`.
+* **Conversion Drop**: Triggers if `daily_conversion_rate < 7_day_moving_average - (2 * std_dev)`.
+* **Dead Zone**: Triggers if `time_since_last_entry(zone_id) > 30 minutes` during peak operating hours.
+
+## Data Models & Event Schema
+
+### Standardized JSON Event Schema
+Events published from the Edge CV pipeline to Kafka follow a strict structure:
+```json
+{
+  "event_id": "evt_987654321",
+  "store_id": "str_xyz123",
+  "camera_id": "cam_04",
+  "visitor_id": "vis_abc987",
+  "event_type": "ZONE_ENTRY",
+  "zone_id": "skincare_aisle",
+  "timestamp": "2026-05-31T14:22:10Z",
+  "confidence": 0.94,
+  "embedding": [0.12, -0.45, ... 512d array]
+}
+```
+
+## Security Posture
+
+Enterprise-grade security is baked into the architecture:
+* **Authentication**: FastAPI utilizes standard OAuth2 with JWT Bearer tokens for all dashboard APIs.
+* **Authorization (RBAC)**: Strict Role-Based Access Control (`Store Manager` vs `Regional Admin`). Managers can only fetch data where `store_id` matches their allowed region.
+* **Edge Security**: Edge camera nodes authenticate with the Kafka broker using mTLS (Mutual TLS).
+* **Rate Limiting**: Redis-backed rate limiters (`100 req/min`) protect public-facing endpoints from abuse.
 
 ## North Star Metric
 

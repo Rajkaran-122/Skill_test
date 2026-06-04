@@ -9,7 +9,7 @@ class APIConfig(BaseSettings):
 
     # Database
     database_url: str = Field(
-        default="postgresql+asyncpg://sip_user:change_me_in_production@localhost:5432/sip_db",
+        default="sqlite+aiosqlite:///./local_mock.db",
         alias="DATABASE_URL",
     )
 

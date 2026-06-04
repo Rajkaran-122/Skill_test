@@ -11,11 +11,12 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from prometheus_fastapi_instrumentator import Instrumentator
 
 from src.config import APIConfig
 from src.db.session import init_db, close_db
-from src.routers import events, metrics, funnel, heatmap, anomalies, health, websocket
+from src.routers import events, metrics, funnel, heatmap, anomalies, health, websocket, auth, insights
 
 logger = structlog.get_logger(__name__)
 
@@ -35,12 +36,25 @@ async def lifespan(app: FastAPI):
     # Initialize Redis
     import redis.asyncio as aioredis
     app.state.redis = aioredis.from_url(config.redis_url, decode_responses=True)
-    logger.info("Redis connected")
+    
+    redis_available = False
+    try:
+        await app.state.redis.ping()
+        logger.info("Redis connected")
+        redis_available = True
+    except Exception as e:
+        logger.warning(f"Redis unavailable, falling back to local mode: {e}")
+        app.state.redis = None
 
     # Initialize WebSocket manager
     from src.services.websocket_manager import WebSocketManager
     app.state.ws_manager = WebSocketManager(app.state.redis)
-    await app.state.ws_manager.start()
+    if redis_available:
+        await app.state.ws_manager.start()
+    else:
+        from src.services.mock_events import simulate_mock_events
+        import asyncio
+        app.state.mock_task = asyncio.create_task(simulate_mock_events(app))
     logger.info("WebSocket manager started")
 
     logger.info("SIP API ready")
@@ -49,8 +63,11 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("Shutting down SIP API")
+    if hasattr(app.state, 'mock_task'):
+        app.state.mock_task.cancel()
     await app.state.ws_manager.stop()
-    await app.state.redis.close()
+    if app.state.redis:
+        await app.state.redis.close()
     await close_db()
     logger.info("SIP API shutdown complete")
 
@@ -81,14 +98,32 @@ def create_app() -> FastAPI:
     # Prometheus metrics
     Instrumentator().instrument(app).expose(app, endpoint="/metrics")
 
-    # Register routers
-    app.include_router(health.router, prefix="/api/v1", tags=["Health"])
-    app.include_router(events.router, prefix="/api/v1", tags=["Events"])
-    app.include_router(metrics.router, prefix="/api/v1", tags=["Metrics"])
-    app.include_router(funnel.router, prefix="/api/v1", tags=["Funnel"])
-    app.include_router(heatmap.router, prefix="/api/v1", tags=["Heatmap"])
-    app.include_router(anomalies.router, prefix="/api/v1", tags=["Anomalies"])
-    app.include_router(websocket.router, prefix="/api/v1", tags=["WebSocket"])
+    # Register routers (for challenge harness)
+    app.include_router(health.router, tags=["Health"])
+    app.include_router(events.router, tags=["Events"])
+    app.include_router(metrics.router, tags=["Metrics"])
+    app.include_router(funnel.router, tags=["Funnel"])
+    app.include_router(heatmap.router, tags=["Heatmap"])
+    app.include_router(anomalies.router, tags=["Anomalies"])
+    app.include_router(websocket.router, tags=["WebSocket"])
+    
+    # Register routers (for the React frontend)
+    app.include_router(health.router, prefix="/api/v1", tags=["Health_UI"])
+    app.include_router(metrics.router, prefix="/api/v1", tags=["Metrics_UI"])
+    app.include_router(funnel.router, prefix="/api/v1", tags=["Funnel_UI"])
+    app.include_router(heatmap.router, prefix="/api/v1", tags=["Heatmap_UI"])
+    app.include_router(anomalies.router, prefix="/api/v1", tags=["Anomalies_UI"])
+    app.include_router(insights.router, prefix="/api/v1", tags=["Insights_UI"])
+    app.include_router(websocket.router, prefix="/api/v1", tags=["WebSocket_UI"])
+    app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
+
+    # Mount static CCTV footage
+    import os
+    footage_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../CCTV Footage"))
+    if os.path.exists(footage_path):
+        app.mount("/footage", StaticFiles(directory=footage_path), name="footage")
+    else:
+        logger.warning(f"CCTV Footage directory not found at {footage_path}")
 
     return app
 

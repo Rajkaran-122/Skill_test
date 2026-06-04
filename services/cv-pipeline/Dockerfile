@@ -19,7 +19,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml .
-RUN pip install --no-cache-dir -e ".[dev]"
+RUN pip install --no-cache-dir setuptools wheel numpy cython scipy pillow torch torchvision
+RUN pip install --no-cache-dir --no-build-isolation -e ".[dev]"
 
 COPY src/ src/
 COPY tests/ tests/

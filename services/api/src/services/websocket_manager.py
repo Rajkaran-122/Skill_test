@@ -46,7 +46,7 @@ class WebSocketManager:
         self._connections[store_id].add(websocket)
 
         # Subscribe to the store's Redis channel if this is the first connection
-        if len(self._connections[store_id]) == 1:
+        if len(self._connections[store_id]) == 1 and self._pubsub:
             channel = f"sip:dashboard:{store_id}"
             await self._pubsub.subscribe(channel)
             logger.info("Subscribed to Redis channel", channel=channel)
@@ -63,8 +63,9 @@ class WebSocketManager:
 
         # Unsubscribe if no more connections for this store
         if not self._connections[store_id]:
-            channel = f"sip:dashboard:{store_id}"
-            await self._pubsub.unsubscribe(channel)
+            if self._pubsub:
+                channel = f"sip:dashboard:{store_id}"
+                await self._pubsub.unsubscribe(channel)
             del self._connections[store_id]
 
     async def _listen(self) -> None:
@@ -96,6 +97,10 @@ class WebSocketManager:
             pass
         except Exception as e:
             logger.error("Redis Pub/Sub listener error", error=str(e))
+
+    async def broadcast_local(self, store_id: str, data: str) -> None:
+        """Broadcast data locally without Redis (for local dev)."""
+        await self._broadcast(store_id, data)
 
     async def _broadcast(self, store_id: str, data: str) -> None:
         """Send data to all WebSocket clients for a store."""

@@ -132,7 +132,8 @@ class CVPipeline:
             while self._running:
                 start_time = time.time()
 
-                ret, frame = cap.read()
+                # Offload blocking I/O to thread
+                ret, frame = await asyncio.to_thread(cap.read)
                 if not ret:
                     # End of video file — loop or stop
                     if isinstance(source, int):
@@ -170,8 +171,8 @@ class CVPipeline:
         with FRAME_LATENCY.time():
             self._frame_count += 1
 
-            # 1. Detect persons
-            detections = self._detector.detect(frame)
+            # 1. Detect persons - Offloaded to thread to prevent blocking event loop
+            detections = await asyncio.to_thread(self._detector.detect, frame)
             DETECTIONS_COUNT.inc(len(detections))
 
             if not detections:
