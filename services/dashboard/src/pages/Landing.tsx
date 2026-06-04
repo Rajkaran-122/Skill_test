@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom';
 import { Camera, Activity, Map, ArrowRight, ShieldCheck, Zap, Database, Cpu, Network, Server } from 'lucide-react';
-import { useEffect, useState } from 'react';
 
 export default function Landing() {
   return (

@@ -4,7 +4,7 @@ import { Users, Target, IndianRupee, ListOrdered, BellRing } from 'lucide-react'
 import { fetchWithAuth } from '../utils/api'
 import { useWebSocket } from '../hooks/useWebSocket'
 import {
-  AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis,
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from 'recharts'
 

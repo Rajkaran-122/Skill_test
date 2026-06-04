@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Store as StoreIcon, Activity, AlertTriangle, TrendingUp, Users, MapPin, ChevronRight } from 'lucide-react';
+import { Store as StoreIcon, AlertTriangle, TrendingUp, Users, MapPin, ChevronRight } from 'lucide-react';
 import { fetchWithAuth } from '../utils/api';
 import { useNavigate } from 'react-router-dom';
 

@@ -138,10 +138,28 @@ open http://localhost:3000
 open http://localhost:3001
 ```
 
-### 4. Simulate Events
+### 4. Run Detection Pipeline
+
+The computer vision pipeline is containerized and runs automatically via Docker. To process the CCTV clips manually:
 
 ```bash
-python scripts/simulate_video.py --events 1000 --kafka localhost:9094
+# Run the pipeline locally (requires Python 3.12+)
+cd services/cv-pipeline
+python -m src.main
+```
+The CV pipeline outputs structured events directly to the Kafka `visitor-events` topic. For offline submission and evaluation, a representative event log is available in `events.jsonl` at the repository root.
+
+#### Exporting Custom Runs for Submission
+If you run the pipeline on new footage, the internal nested schema must be mapped to the HackerEarth evaluation schema. Use the provided export script:
+```bash
+python scripts/export_flat_events.py --input <your_raw_nested_events.jsonl> --output events.jsonl
+```
+
+### 5. Simulate Events (Alternative)
+
+If you just want to simulate traffic to the API without running the heavy CV pipeline:
+```bash
+python scripts/simulate_video.py --file problem_statement/sample_eventsbe42122.jsonl --url http://localhost:8000/api/v1/events/ingest
 ```
 
 ## Services
