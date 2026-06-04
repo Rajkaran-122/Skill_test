@@ -2,7 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom'
 import { LayoutDashboard, Video, AlertTriangle, Store } from 'lucide-react'
 
 const navItems = [
-  { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
+  { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
   { icon: Video, label: 'Live Feeds', path: '/live' },
   { icon: AlertTriangle, label: 'Alerts Inbox', path: '/alerts' },
   { icon: Store, label: 'Stores Fleet', path: '/stores' },

@@ -77,20 +77,20 @@ module.exports = {
 					'4': 'hsl(var(--chart-4))',
 					'5': 'hsl(var(--chart-5))'
 				},
-				// Custom theme colors
+				// Custom theme colors for $50M Enterprise SaaS
 				dark: {
-					'bg-primary': '#0A0A0F',
-					'bg-secondary': '#12121A',
-					'bg-tertiary': '#1A1A24',
-					'bg-hover': '#22222E',
-					'bg-active': '#2A2A38',
+					'bg-primary': '#050816',
+					'bg-secondary': '#0B1220',
+					'bg-tertiary': '#0F172A',
+					'bg-hover': '#1E293B',
+					'bg-active': '#334155',
 				},
 				'border-subtle': '#1E1E2A',
 				'border-default': '#2A2A3A',
 				'border-strong': '#3A3A4A',
-				'text-primary': '#FFFFFF',
-				'text-secondary': '#A1A1AA',
-				'text-tertiary': '#71717A',
+				'text-primary': '#F8FAFC',
+				'text-secondary': '#94A3B8',
+				'text-tertiary': '#64748B',
 			},
 			boxShadow: {
 				'sm': '0 1px 2px rgba(0, 0, 0, 0.4)',
@@ -133,6 +133,14 @@ module.exports = {
 					from: { transform: 'translateX(-100%)' },
 					to: { transform: 'translateX(0)' }
 				},
+				'float': {
+					'0%, 100%': { transform: 'translateY(0)' },
+					'50%': { transform: 'translateY(-20px)' },
+				},
+				'data-stream': {
+					'0%': { transform: 'translateX(-100%)' },
+					'100%': { transform: 'translateX(100%)' },
+				}
 			},
 			animation: {
 				'accordion-down': 'accordion-down 0.2s ease-out',
@@ -143,6 +151,9 @@ module.exports = {
 				'fade-in': 'fade-in 0.3s ease-out',
 				'slide-in-right': 'slide-in-right 0.3s ease-out',
 				'slide-in-left': 'slide-in-left 0.3s ease-out',
+				'float': 'float 6s ease-in-out infinite',
+				'float-delayed': 'float 6s ease-in-out 3s infinite',
+				'data-stream': 'data-stream 2s linear infinite',
 			},
 			transitionProperty: {
 				'height': 'height',
